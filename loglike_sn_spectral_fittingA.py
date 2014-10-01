@@ -1,5 +1,5 @@
 #! usr/bin/python
-"""This script make use of the likehood and prior functions as input to the imported mcmc module 
+"""This script makes use of the likehood and prior functions as input to the imported mcmc module 
 (global_mcmc authored by Michelle Knights) to obtain the best fit parameters for the amplitudes of the 
 supernova (SN) and galaxy templates fitted to an observed SN spectrum contaminated with host galaxy 
 light in an attempt to quantify the amount of host galaxy light contamination"""
