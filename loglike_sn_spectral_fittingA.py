@@ -10,12 +10,28 @@ import numpy as np
 import pyfits
 from PySpectrograph import Spectrum
 
+import pylab as plt
+
 def interpo(wav, wavt, fluxt):
-    interpol=np.interp(wav, wavt, fluxt)
     """becasue the observed spectrum do not have the same wavelength 
     binning as the templates, this function re-maps/re-calculates the template 
     fluxes using the observed spectrum wavelength binning"""
+    interpol=np.interp(wav, wavt, fluxt)
     return interpol
+
+def create_spectrum(warr, farr, earr=None):
+    """Create spectrum object and normalize it to 5500 Angstroms
+    """
+    spec=Spectrum.Spectrum(warr, farr, earr, stype='continuum')
+    #normalize the spectra to 5500
+    n5500 = np.interp(5500, spec.wavelength, spec.flux)
+    spec.flux = spec.flux/n5500
+    if earr is not None:
+       spec.var = spec.var/n5500
+    coef = np.polyfit(spec.wavelength, spec.flux, 9)
+    #add in continuum subtraction
+    spec.flux = spec.flux - np.polyval(coef, spec.wavelength) 
+    return spec
 
 def loadsdss(hdu):
    """this function converts the sdss gal template spectra from fits format 
@@ -24,67 +40,111 @@ def loadsdss(hdu):
    farr=hdu[0].data[0]
    xarr=np.arange(len(farr))
    warr=10**(hdu[0].header['CRVAL1']+hdu[0].header['CD1_1']*(xarr+1))
-   gal=Spectrum.Spectrum(warr, farr, stype='continuum')
-   return gal
+   return create_spectrum(warr, farr)
    
 def loadtext(infile):
-   warr, farr, earr=np.loadtxt(infile, usecols=(0,1,2), unpack=True)
    """this creates a spectrum out of the salt reduced, wavelength 
     calib. and flux calib. 1d ascii spectrum"""
-   spec=Spectrum.Spectrum(warr, farr, earr, stype='continuum')
-   return spec 
+   warr, farr, earr=np.loadtxt(infile, usecols=(0,1,2), unpack=True)
+   return create_spectrum(warr, farr, earr)
 
 def loadtext2(infile):
     """this is similart to 'loadtxt' except specifically created for Nugent's
     normal SN Ia template spectra which do not have an extra column
     for errors in the observed fluxes"""
     warrsn, farrsn =np.loadtxt(infile, usecols=(0, 1), unpack=True)
-    snspec=Spectrum.Spectrum(warrsn, farrsn, stype='continuum')
-    return snspec
+    return create_spectrum(warrsn, farrsn)
 
 def likelihood(params,data):  
     obswav=spec.wavelength
     obsflux=spec.flux
     obsferr=spec.var
-    snwav=sntmpl.wavelength
-    snflux=sntmpl.flux
-    galwav=galtmpl.wavelength
-    galflux=galtmpl.flux
-    isnflux=interpo(obswav, snwav, snflux)
-    igalflux=interpo(obswav, galwav, galflux)
+    #snwav=sntmpl.wavelength
+    #snflux=sntmpl.flux
+    #galwav=galtmpl.wavelength
+    #galflux=galtmpl.flux
+    #isnflux=interpo(spec.wavelength, sntmpl.wavelength, sntmpl.flux)
+    #igalflux=interpo(spec.wavelength, galtmpl.wavelength, galtmpl.flux)
     chi2=0
-    chi2 += sum((params[0]*isnflux - (obsflux - (params[1]*igalflux)))**2)/((0.05*sum(obsferr)**2)/2.0)
-             
-    return -chi2/2.0  
+    modflux = (params[0]*isnflux + params[1]*igalflux)
+    chi2 += sum((obsflux - modflux)**2)/((0.05*sum(obsferr)**2)/2.0)
+          
+    return np.exp(-chi2/2.0)
     
 def prior(old_params,params):
     """old_params is just a requirement by mcmc_global and has no significance
     in the definition of this function. We put a flat prior (zero and unity) on the parameters
     and define their range to be between 0 and 200"""
+    
     for s in range(len(params)):
-        if params[s] < 0.0 or params[s] > 200:
+        if params[s] < 0.0 or params[s] > 2:
             return 0
-        else:
-            return 1
+    return 1
            
 
-spec=loadtext('DES13X1kae.1029_32_1018.spec')
-sntmpl=loadtext2('sn8.dat') # this is a Nugent normal SN Ia template at epoch 8
-galtmpl=loadsdss(pyfits.open('spDR2-027.fit'))
+#spec=loadtext('DES13X1kae.1029_32_1018.spec')
+#sntmpl=loadtext2('sn8.dat') # this is a Nugent normal SN Ia template at epoch 8
+#galtmpl=loadsdss(pyfits.open('spDR2-027.fit'))
 
-N=100000 # number of steps
+N=10000 # number of steps
 
 """ sizes of the random jumps sig and initial guesses for the parameters
 t0"""
-sig=np.array([0.1,0.1])*2.5
-t0=np.array([1.0,2.0])*10
+sig=np.array([0.1,0.1])*2
+t0=np.array([0.5,0.5])
 
-global_mcmc.mcmc(likelihood,prior,t0,N,sig,spec,'sn_spectral_fitting.txt')
-
-"""if __name__=='__main__':
+if __name__=='__main__':
     spec=loadtext(sys.argv[1])
+    spec.wavelength = spec.wavelength / (1+float(sys.argv[4]))
+    
     sntmpl=loadtext2(sys.argv[2])
-    galtmpl=loadsdss(pyfits.open(sys.argv[3]))"""
+    galtmpl=loadsdss(pyfits.open(sys.argv[3]))
+
+    plt.plot(spec.wavelength, spec.flux)
+    isnflux=interpo(spec.wavelength, sntmpl.wavelength, sntmpl.flux)
+    plt.plot(spec.wavelength, isnflux)
+    igalflux=interpo(spec.wavelength, galtmpl.wavelength, galtmpl.flux)
+    plt.plot(spec.wavelength, igalflux)
+    plt.show()
+
+    #global_mcmc.mcmc(likelihood,prior,t0,N,sig,spec,'sn_spectral_fitting.txt')
+
+    #This is just a blunt method for doing this
+    bestl=0
+    data = []
+    for i in  np.arange(0,20, 0.5):
+      for j in np.arange(0,20,0.5):
+         l=likelihood([i,j], data)
+         if l > bestl:
+            bestl=l
+            n1 = i
+            n2 = j
+    print n1, n2, l
+
+
+    #p1, p2, l = np.loadtxt('sn_spectral_fitting.txt', unpack=True)
+    #n1 = np.histogram(p1, bins=50)
+    #i = n1[0].argmax()
+    #n1 = n1[1][i]
+    #n2 = np.histogram(p2, bins=50)
+    #i = n2[0].argmax()
+    #n2 = n2[1][i]
+
+
+    #i = np.array(l).argmax()
+    #n1 = p1[i]
+    #n2 = p2[i]
+    #print n1, n2, l[i]
+    #plt.figure()
+    #plt.plot(p1, np.log(1-l), marker='o', ls='')
+    #plt.figure()
+    #plt.plot(p2, np.log(1-l), marker='o', ls='')
+    plt.figure()
+    plt.plot(spec.wavelength, spec.flux)
+    plt.plot(spec.wavelength, n1*isnflux + n2*igalflux)
+    plt.show()
+    
+
     
 
     

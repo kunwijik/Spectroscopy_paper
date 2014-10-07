@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 def mcmc(likelihood,prior,t0,N,sig,data,filename,**kwargs):
     save_step=1000 #How often we save the chain to file and reset the matrix
     COV=False #Turn the use of the covariance matrix on and off
-    LOG=True #Using loglikelihood instead of likelihood
+    LOG=False #Using loglikelihood instead of likelihood
     n = len(t0) #Number of parameters
     sucsteps = 0 #Number of successful steps
 
