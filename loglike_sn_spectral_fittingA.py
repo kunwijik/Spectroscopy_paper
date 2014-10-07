@@ -19,7 +19,7 @@ def interpo(wav, wavt, fluxt):
     interpol=np.interp(wav, wavt, fluxt)
     return interpol
 
-def create_spectrum(warr, farr, earr=None):
+def create_spectrum(warr, farr, earr=None, sub_cont=False):
     """Create spectrum object and normalize it to 5500 Angstroms
     """
     spec=Spectrum.Spectrum(warr, farr, earr, stype='continuum')
@@ -28,9 +28,10 @@ def create_spectrum(warr, farr, earr=None):
     spec.flux = spec.flux/n5500
     if earr is not None:
        spec.var = spec.var/n5500
-    coef = np.polyfit(spec.wavelength, spec.flux, 9)
     #add in continuum subtraction
-    spec.flux = spec.flux - np.polyval(coef, spec.wavelength) 
+    if sub_cont:
+       coef = np.polyfit(spec.wavelength, spec.flux, 9)
+       spec.flux = spec.flux - np.polyval(coef, spec.wavelength) 
     return spec
 
 def loadsdss(hdu):
@@ -56,19 +57,15 @@ def loadtext2(infile):
     return create_spectrum(warrsn, farrsn)
 
 def likelihood(params,data):  
+    """Add description here of inputs"""
+    spec, isnflux, igalflux = data
     obswav=spec.wavelength
     obsflux=spec.flux
     obsferr=spec.var
-    #snwav=sntmpl.wavelength
-    #snflux=sntmpl.flux
-    #galwav=galtmpl.wavelength
-    #galflux=galtmpl.flux
-    #isnflux=interpo(spec.wavelength, sntmpl.wavelength, sntmpl.flux)
-    #igalflux=interpo(spec.wavelength, galtmpl.wavelength, galtmpl.flux)
+
     chi2=0
     modflux = (params[0]*isnflux + params[1]*igalflux)
     chi2 += sum((obsflux - modflux)**2)/((0.05*sum(obsferr)**2)/2.0)
-          
     return np.exp(-chi2/2.0)
     
 def prior(old_params,params):
@@ -86,14 +83,14 @@ def prior(old_params,params):
 #sntmpl=loadtext2('sn8.dat') # this is a Nugent normal SN Ia template at epoch 8
 #galtmpl=loadsdss(pyfits.open('spDR2-027.fit'))
 
-N=10000 # number of steps
 
-""" sizes of the random jumps sig and initial guesses for the parameters
-t0"""
-sig=np.array([0.1,0.1])*2
-t0=np.array([0.5,0.5])
 
 if __name__=='__main__':
+    """ sizes of the random jumps sig and initial guesses for the parameters
+    t0"""
+    N=10000 # number of steps
+    sig=np.array([0.1,0.1])*2
+    t0=np.array([0.5,0.5])
     spec=loadtext(sys.argv[1])
     spec.wavelength = spec.wavelength / (1+float(sys.argv[4]))
     
@@ -105,40 +102,34 @@ if __name__=='__main__':
     plt.plot(spec.wavelength, isnflux)
     igalflux=interpo(spec.wavelength, galtmpl.wavelength, galtmpl.flux)
     plt.plot(spec.wavelength, igalflux)
-    plt.show()
-
-    #global_mcmc.mcmc(likelihood,prior,t0,N,sig,spec,'sn_spectral_fitting.txt')
+    #plt.show()
+    data = [spec, isnflux, igalflux]
+    global_mcmc.mcmc(likelihood,prior,t0,N,sig,data,'sn_spectral_fitting.txt')
 
     #This is just a blunt method for doing this
-    bestl=0
-    data = []
-    for i in  np.arange(0,20, 0.5):
-      for j in np.arange(0,20,0.5):
-         l=likelihood([i,j], data)
-         if l > bestl:
-            bestl=l
-            n1 = i
-            n2 = j
-    print n1, n2, l
+    #bestl=0
+    #data = []
+    #for i in  np.arange(0,20, 0.5):
+    #  for j in np.arange(0,20,0.5):
+    #     l=likelihood([i,j], data)
+    #     if l > bestl:
+    #        bestl=l
+    #        n1 = i
+    #        n2 = j
+    #print n1, n2, l
 
 
-    #p1, p2, l = np.loadtxt('sn_spectral_fitting.txt', unpack=True)
-    #n1 = np.histogram(p1, bins=50)
-    #i = n1[0].argmax()
-    #n1 = n1[1][i]
-    #n2 = np.histogram(p2, bins=50)
-    #i = n2[0].argmax()
-    #n2 = n2[1][i]
+    p1, p2, l = np.loadtxt('sn_spectral_fitting.txt', unpack=True)
 
+    i = np.array(l).argmax()
+    n1 = p1[i]
+    n2 = p2[i]
+    print n1, n2, l[i]
 
-    #i = np.array(l).argmax()
-    #n1 = p1[i]
-    #n2 = p2[i]
-    #print n1, n2, l[i]
-    #plt.figure()
-    #plt.plot(p1, np.log(1-l), marker='o', ls='')
-    #plt.figure()
-    #plt.plot(p2, np.log(1-l), marker='o', ls='')
+    plt.figure()
+    plt.plot(p1, l, marker='o', ls='')
+    plt.figure()
+    plt.plot(p2, np.log(1-l), marker='o', ls='')
     plt.figure()
     plt.plot(spec.wavelength, spec.flux)
     plt.plot(spec.wavelength, n1*isnflux + n2*igalflux)
