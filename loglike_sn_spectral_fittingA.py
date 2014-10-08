@@ -79,9 +79,37 @@ def prior(old_params,params):
     return 1
            
 
-#spec=loadtext('DES13X1kae.1029_32_1018.spec')
-#sntmpl=loadtext2('sn8.dat') # this is a Nugent normal SN Ia template at epoch 8
-#galtmpl=loadsdss(pyfits.open('spDR2-027.fit'))
+def fit_spectra(data, t0, sig, N=10000):
+    """Fit spectra runs global mcmc on one data set
+    
+       Parameters:
+       -----------
+       data: list
+           List containing a spectral object, SN template flux at the same 
+           wavelengths as the spectral object, and a galaxy template flux at the
+           same wavelengths of the spectral object:w
+
+       Output
+       ------
+       n1: float
+           Best normalization for the SN template
+
+       n2: float
+           Best normalization for the galaxy template
+
+       likelihood: float
+           Likelihood for best fit combination of SN and galaxy template
+
+
+    """
+    global_mcmc.mcmc(likelihood,prior,t0,N,sig,data,'sn_spectral_fitting.txt')
+
+    #read in results from mcmc
+    p1, p2, l = np.loadtxt('sn_spectral_fitting.txt', unpack=True)
+    i = np.array(l).argmax()
+    n1 = p1[i]
+    n2 = p2[i]
+    return n1, n2, l[i]
 
 
 
@@ -103,8 +131,9 @@ if __name__=='__main__':
     igalflux=interpo(spec.wavelength, galtmpl.wavelength, galtmpl.flux)
     plt.plot(spec.wavelength, igalflux)
     #plt.show()
+
     data = [spec, isnflux, igalflux]
-    global_mcmc.mcmc(likelihood,prior,t0,N,sig,data,'sn_spectral_fitting.txt')
+    n1, n2, l = fit_spectra(data, t0, sig, N)
 
     #This is just a blunt method for doing this
     #bestl=0
@@ -119,17 +148,12 @@ if __name__=='__main__':
     #print n1, n2, l
 
 
-    p1, p2, l = np.loadtxt('sn_spectral_fitting.txt', unpack=True)
+    print n1, n2, l
 
-    i = np.array(l).argmax()
-    n1 = p1[i]
-    n2 = p2[i]
-    print n1, n2, l[i]
-
-    plt.figure()
-    plt.plot(p1, l, marker='o', ls='')
-    plt.figure()
-    plt.plot(p2, np.log(1-l), marker='o', ls='')
+    #plt.figure()
+    #plt.plot(p1, l, marker='o', ls='')
+    #plt.figure()
+    #plt.plot(p2, np.log(1-l), marker='o', ls='')
     plt.figure()
     plt.plot(spec.wavelength, spec.flux)
     plt.plot(spec.wavelength, n1*isnflux + n2*igalflux)
