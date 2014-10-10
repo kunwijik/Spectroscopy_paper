@@ -12,13 +12,6 @@ from PySpectrograph import Spectrum
 
 import pylab as plt
 
-def interpo(wav, wavt, fluxt):
-    """becasue the observed spectrum do not have the same wavelength 
-    binning as the templates, this function re-maps/re-calculates the template 
-    fluxes using the observed spectrum wavelength binning"""
-    interpol=np.interp(wav, wavt, fluxt)
-    return interpol
-
 def create_spectrum(warr, farr, earr=None, sub_cont=False):
     """Create spectrum object and normalize it to 5500 Angstroms
     """
@@ -59,13 +52,9 @@ def loadtext2(infile):
 def likelihood(params,data):  
     """Add description here of inputs"""
     spec, isnflux, igalflux = data
-    obswav=spec.wavelength
-    obsflux=spec.flux
-    obsferr=spec.var
-
     chi2=0
     modflux = (params[0]*isnflux + params[1]*igalflux)
-    chi2 += sum((obsflux - modflux)**2)/((0.05*sum(obsferr)**2)/2.0)
+    chi2 += sum((spec.flux - modflux)**2)/((0.05*sum(spec.var)**2)/2.0)
     return np.exp(-chi2/2.0)
     
 def prior(old_params,params):
@@ -78,22 +67,29 @@ def prior(old_params,params):
             return 0
     return 1
 
-snlist=['sn' + str(i) + '.dat' for i in range(18, 23)]
+snlist=['sn' + str(i) + '.dat' for i in range(18, 23)] 
+#the range can be change to whatever SN Ia templates are desired for the fitting
 gallist=['spDR2-02' + str(j) + '.fit' for j in range(3, 8)]
 fout=open('final_params.dat',  'w')
 
 sig=np.array([0.1,0.1])*7
 t0=np.array([0.5,0.5])
 spec=loadtext(sys.argv[1])
+
+"""We transform the observed spectrum to restframe"""
 spec.wavelength = spec.wavelength / (1+float(sys.argv[2]))
-N=int(sys.argv[3]) 
+
+N=int(sys.argv[3]) #number of steps required for the mcmc
 
 for snt in snlist:
    for galt in gallist: 
     sntmpl=loadtext2(snt)
     galtmpl=loadsdss(pyfits.open(galt))
-    isnflux=interpo(spec.wavelength, sntmpl.wavelength, sntmpl.flux)
-    igalflux=interpo(spec.wavelength, galtmpl.wavelength, galtmpl.flux ) 
+    """becasue the observed spectrum do not have the same wavelength 
+    binning and therefore corresponding fluxes as the templates, we interpolate 
+    the template fluxes using the observed spectrum wavelength binning"""
+    isnflux=np.interp(spec.wavelength, sntmpl.wavelength, sntmpl.flux)
+    igalflux=np.interp(spec.wavelength, galtmpl.wavelength, galtmpl.flux ) 
     data=[spec, isnflux, igalflux]
     global_mcmc.mcmc(likelihood,prior,t0,N,sig,data, snt + '_' + galt +'.txt')
     #read in results from mcmc
@@ -107,17 +103,26 @@ fout.close()
 fin=open('final_params.dat', 'r')
 fin_lines=file.readlines(fin)
 norm1, norm2,like=np.loadtxt('final_params.dat',usecols=(2, 3, 4), unpack=True)
-k=like.argmax()
-print fin_lines[k]
+k=like.argmax() # index of the maximum likelihood value
 
+"""This prints out the best fit templates, their normalisations
+and the likelihood""" 
+print fin_lines[k] 
+
+
+"""We select the normalisations corresponding to the maximum likelihood
+as the best fit normalisations and use these to scale the SN and galaxy
+templates accordingly"""
 norm1=float(fin_lines[k].split()[2])
 norm2=float(fin_lines[k].split()[3])
+
+"""bsnt and bgalt are the best fitted sn and galaxy templates"""
 bsnt=loadtext2(str(fin_lines[k].split()[0]))
 bgalt=loadsdss(pyfits.open(str(fin_lines[k].split()[1])))
-"""bsnt and bgalt are best fitted sn and galaxy templates"""
 
-ibsntflux=interpo(spec.wavelength, bsnt.wavelength, bsnt.flux)
-ibgaltflux=interpo(spec.wavelength, bgalt.wavelength, bgalt.flux )
+
+ibsntflux=np.interp(spec.wavelength, bsnt.wavelength, bsnt.flux)
+ibgaltflux=np.interp(spec.wavelength, bgalt.wavelength, bgalt.flux )
 
 plt.plot(spec.wavelength, spec.flux)
 plt.plot(spec.wavelength, norm1*ibsntflux + norm2*ibgaltflux)
