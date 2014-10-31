@@ -116,7 +116,7 @@ def fit_spectra(data, t0, sig, N=10000):
 if __name__=='__main__':
     """ sizes of the random jumps sig and initial guesses for the parameters
     t0"""
-    N=10000 # number of steps
+    N=10000
     sig=np.array([0.1,0.1])*2
     t0=np.array([0.5,0.5])
     spec=loadtext(sys.argv[1])
@@ -158,8 +158,6 @@ if __name__=='__main__':
     plt.plot(spec.wavelength, spec.flux)
     plt.plot(spec.wavelength, n1*isnflux + n2*igalflux)
     plt.show()
-    
-
     
 
     

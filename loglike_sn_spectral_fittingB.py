@@ -69,12 +69,12 @@ def prior(old_params,params):
 
 if __name__=='__main__':
     
-    snlist=['sn' + str(i) + '.dat' for i in range(18, 23)] 
+    snlist=['sn' + str(p) + '.dat' for p in range(18, 23)]
     #the range can be change to whatever SN Ia templates are desired for the fitting
     gallist=['spDR2-02' + str(j) + '.fit' for j in range(3, 8)]
     fout=open('final_params.dat',  'w')
 
-    sig=np.array([0.1,0.1])*7
+    sig=np.array([0.1,0.1])*2
     t0=np.array([0.5,0.5])
     spec=loadtext(sys.argv[1])
 

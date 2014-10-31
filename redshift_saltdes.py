@@ -48,7 +48,6 @@ def loadtext(infile):
    spec=Spectrum.Spectrum(warr, farr, stype='continuum')
    return spec
     
-
 def loadiraf(hdu):
    farr=hdu[0].data
    xarr=np.arange(len(farr))
@@ -67,7 +66,6 @@ def loadsdss(hdu):
 
 def loadsnspec(hdu):
     farr=hdu[0].data[0]
-    print len(farr)
     xarr=np.arange(len(farr))
     warr=10**(hdu[0].header['CRVAL1']+hdu[0].header['CD1_1']*(xarr+1))
     spec=Spectrum.Spectrum(warr, farr, stype='continuum')

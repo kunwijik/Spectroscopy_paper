@@ -1,0 +1,15 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Exec=eric4
+MimeType=text/x-python;
+Icon=eric4
+Terminal=false
+Name=eric4
+Name[de]=eric4
+Comment=Integrated Development Environment for Python
+Comment[de]=Integrierte Entwicklungsumgebung für Python
+GenericName=Integrated Development Environment for Python
+GenericName[de]=Integrierte Entwicklungsumgebung für Python
+Categories=Qt;Python;Development;IDE;
+StartupNotify=true
